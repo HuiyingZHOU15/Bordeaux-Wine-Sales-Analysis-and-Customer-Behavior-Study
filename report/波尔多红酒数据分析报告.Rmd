@@ -1,0 +1,298 @@
+---
+title: "波尔多葡萄酒分析报告"
+author: "周慧盈"
+output: html_document
+---
+
+## 项目背景
+
+本项目基于波尔多红酒销售交易数据，对客户购买行为进行统计分析。
+通过探索性数据分析与统计检验方法，研究不同客户群体在消费行为、
+产品选择以及促销策略响应上的差异，为红酒营销策略制定提供数据支持。
+
+
+## 数据说明
+
+数据包含三张表：
+
+- customers：客户信息
+- products：红酒产品信息
+- transactions：销售交易数据
+
+主要字段：
+
+- customer_id
+- product_id
+- order_amount
+- quantity
+- purchase_date
+- segment
+
+##数据读取和准备
+```{r}
+library(tidyverse)
+library(lubridate)
+
+customers <- read.csv("E:/projet/wine/data/customers.csv")
+products <- read.csv("E:/projet/wine/data/products.csv")
+transactions <- read.csv("E:/projet/wine/data/transactions.csv")
+
+transactions$purchase_date <- as.Date(transactions$purchase_date)
+
+data <- transactions %>%
+  left_join(customers, by="customer_id") %>%
+  left_join(products, by="product_id")
+```
+
+
+
+## 数据探索分析
+```{r}
+#销售金额分布
+p<-ggplot(data, aes(x=order_amount)) +
+  geom_histogram(bins=40, fill="steelblue") +
+  labs(title="订单金额分布")
+ggsave("E:/projet/wine/output/figures/订单金额分布.png", p)
+
+#购买频次分布
+purchase_freq <- data %>%
+  group_by(customer_id) %>%
+  summarise(freq=n())
+
+p<-ggplot(purchase_freq, aes(x=freq)) +
+  geom_histogram(bins=30, fill="orange")
+ggsave("E:/projet/wine/output/figures/购买频率.png", p)
+
+#产品类别销量
+product_sales <- data %>%
+  group_by(Name) %>%
+  summarise(sales=sum(quantity)) %>%
+  arrange(desc(sales)) %>%
+  head(10)
+
+p<-ggplot(product_sales,
+       aes(x=reorder(Name,sales), y=sales)) +
+  geom_bar(stat="identity") +
+  coord_flip()
+ggsave("E:/projet/wine/output/figures/产品类别销量.png", p)
+
+#月度销售趋势
+monthly_sales <- data %>%
+  mutate(month=floor_date(purchase_date,"month")) %>%
+  group_by(month) %>%
+  summarise(sales=sum(order_amount))
+
+p<-ggplot(monthly_sales,aes(x=month,y=sales))+
+  geom_line()
+ggsave("E:/projet/wine/output/figures/月度销售趋势.png", p)
+```
+1,订单金额分布（Order Amount Distribution）
+
+从订单金额直方图可以看出，订单金额呈现明显的右偏分布（right-skewed distribution）。大部分订单金额集中在较低区间，主要分布在 0–300 欧元之间，而只有少数订单金额超过 1000 欧元，形成明显的长尾现象。
+
+这种分布特征在零售和电商消费数据中较为常见，说明：
+
+绝大多数客户属于普通消费群体
+
+少量高价值订单对整体销售额贡献较大
+
+因此，在运营策略上可以考虑：
+
+通过会员制度或个性化推荐维系高价值客户,提高普通客户的复购率以增加整体销售额
+
+2、客户购买频率（Customer Purchase Frequency）
+
+客户购买频率分布图显示，大多数客户的购买频率集中在 5–10 次之间，整体呈现近似正态分布。
+
+这说明：
+客户消费行为相对稳定
+大部分客户属于中等活跃用户
+同时仍存在少量高频客户，其购买次数超过 15 次。这些客户通常具有较高的客户生命周期价值（Customer Lifetime Value）。
+
+因此可考虑：
+对高频客户提供会员优惠或专属推荐，针对低频客户设计促销活动以提高复购率
+
+3、产品销量排名（Top Selling Wines）
+
+产品销量排名图显示，不同酒款之间的销量差异较为明显。销量排名靠前的酒款主要集中在以下品牌：
+
+Château d'Issan Margaux
+
+Château Cantenac-Brown Margaux
+
+Château Beychevelle St-Julien
+
+这些酒款可能具有以下特点：
+
+品牌知名度较高
+
+价格处于消费者可接受范围
+
+口碑评分较好
+
+说明在红酒销售中，品牌影响力和产品定位对销量具有重要影响。
+
+运营建议：
+
+对销量较高的酒款进行重点推广
+
+将其作为推荐产品或活动商品
+
+订单金额呈现明显的右偏分布，大多数订单金额集中在较低区间，
+但存在少量高金额订单，表现出典型的长尾特征。
+
+4，月度销售趋势
+月度销售趋势图显示，2025 年的销售额整体保持在较高水平，但存在一定波动。
+
+观察趋势可以发现：
+
+年中（6–7月）销售额达到全年最高水平
+
+年初和年末销售额相对较低
+
+这种波动可能与以下因素有关：
+
+节假日消费需求变化
+
+促销活动周期
+
+市场需求季节性变化
+
+此外，2026 年初销售额出现明显下降，可能是由于：
+
+数据尚未完整
+
+当月交易数据不足
+
+因此在分析时需要注意数据时间范围。
+
+##异常值分析
+
+```{r}
+ggplot(data, aes(y=order_amount)) +
+ geom_boxplot()
+```
+##统计检验
+```{r}
+shapiro.test(sample(data$order_amount,500))
+```
+Shapiro-Wilk 检验结果表明订单金额分布显著偏离正态分布，
+符合消费数据常见的长尾分布特征。
+
+##客户群消费差异(anova)
+```{r}
+anova_result <- aov(order_amount ~ segment, data=data)
+summary(anova_result)
+```
+采用单因素方差分析（ANOVA）比较不同客户群体（Occasional、Regular、Premium）的平均订单金额差异。结果显示组间差异不显著（F = 0.064，p = 0.938），说明在当前数据中，不同客户群体在单次消费金额上不存在显著差异。
+
+##产品选择差异
+```{r}
+table_data <- table(data$segment, data$Name)
+chisq.test(table_data)
+
+```
+卡方检验结果表明不同客户群体在酒款选择上不存在显著差异。
+
+##A/B Test 实验分析
+
+```{r}
+t.test(order_amount ~ experiment_group, data=data)
+ggplot(data, aes(experiment_group, order_amount)) +
+  geom_boxplot(fill="steelblue") +
+  labs(title="A/B Test Order Amount Comparison")
+```
+本研究通过 A/B Test 比较两种促销策略对销售表现的影响。实验将客户随机划分为两组，其中 A 组采用新的促销策略（推荐高评分红酒并提供折扣），B 组采用原有展示策略。通过 Welch t 检验比较两组订单金额，结果显示 A 组平均订单金额（171.14）显著高于 B 组（150.82）（p = 0.0019）。结果表明新的促销策略在提升客单价方面具有显著效果。
+
+##结论与建议
+
+综合以上分析，可以得到以下主要结论：
+
+红酒订单金额呈明显长尾分布，大部分订单金额较低，但少量高价值订单对销售额贡献显著。
+
+客户购买频率主要集中在中等水平，存在少量高频客户，具有较高的商业价值。
+
+不同酒款之间销量差异明显，品牌和产品定位对销售表现具有重要影响。
+
+数据中存在部分高金额异常订单，这些订单可能来自高端消费群体。
+
+A/B Test 结果表明新的营销策略能够有效提升客单价。
+
+月度销售趋势存在一定波动，可能受到季节性消费和市场需求变化的影响。
+
+运营建议：
+基于本次对波尔多红酒销售数据的统计分析与客户行为研究，可以提出以下运营优化建议：
+
+1 提升高价值客户管理
+
+数据分析表明，订单金额呈现明显的长尾分布，少数高金额订单对整体销售额贡献较大。这说明部分客户具有较高的消费能力和客户生命周期价值。
+
+因此建议：
+
+建立 VIP 客户管理体系
+
+为高价值客户提供 会员折扣、专属推荐或限量酒款
+
+通过个性化营销提高客户忠诚度
+
+通过加强对高价值客户的运营，可以进一步提升整体销售收入。
+
+2 优化产品推荐策略
+
+销量排名显示，部分品牌酒款销量明显高于其他产品，说明消费者对特定品牌和酒庄具有较强偏好。
+
+运营上可以：
+
+将 销量较高的酒款作为主推产品
+
+在首页推荐或促销活动中重点展示热门酒款
+
+利用数据分析持续识别潜力产品
+
+通过优化产品推荐策略，可以提高商品曝光率并促进销售增长。
+
+3 利用 A/B Test 优化营销策略
+
+A/B Test 结果显示，不同营销策略对订单金额存在显著影响，其中实验组策略能够有效提升客户客单价。
+
+因此建议：
+
+在更大范围内推广实验组营销策略
+
+持续进行 数据驱动的营销实验（A/B Testing）
+
+定期评估促销策略效果并进行优化
+
+通过数据驱动的实验方法，可以不断提升营销效率。
+
+4 提高客户复购率
+
+客户购买频率分析表明，大多数客户的购买次数集中在中等水平，仍存在提升空间。
+
+建议：
+
+通过 优惠券、积分制度或会员奖励 提高复购率
+
+针对低频客户进行定向营销
+
+通过邮件或推荐系统提醒客户再次购买
+
+提升客户复购率有助于稳定销售增长。
+
+5 挖掘高端红酒市场
+
+异常值分析显示，部分订单金额远高于平均水平，说明市场中存在一定比例的高端消费需求。
+
+因此可以：
+
+增加 高端红酒产品线
+
+推出 限量酒款或收藏级酒款
+
+针对高端客户开展定向营销
+
+这有助于提升整体利润水平。
+
+总结
+
+综合来看，本次分析表明红酒市场具有明显的客户价值分层和消费差异。通过加强高价值客户管理、优化产品推荐策略、持续开展 A/B Test 实验以及提升客户复购率，可以进一步提升销售效率和市场竞争力。
